@@ -1,5 +1,6 @@
 package com.linuxacademy.ccdak.streams;
 
+import java.time.Duration;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import org.apache.kafka.common.serialization.Serdes;
@@ -7,7 +8,14 @@ import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
-
+import org.apache.kafka.streams.kstream.KGroupedStream;
+import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.KTable;
+import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.kstream.TimeWindowedKStream;
+import org.apache.kafka.streams.kstream.TimeWindows;
+import org.apache.kafka.streams.kstream.Windowed;
+import org.apache.kafka.streams.kstream.WindowedSerdes;
 public class WindowingMain {
 
     public static void main(String[] args) {
@@ -22,9 +30,12 @@ public class WindowingMain {
 
         // Get the source stream.
         final StreamsBuilder builder = new StreamsBuilder();
-        
-        //Implement streams logic.
-        
+        KStream<String, String> source = builder.stream("windowing-input-topic");
+        KGroupedStream<String, String> groupedStream = source.groupByKey();
+        TimeWindowedKStream<String, String> windowedStream = groupedStream.windowedBy(TimeWindows.of(Duration.ofSeconds(10)));
+        KTable<Windowed<String>, String> reducedTable = windowedStream.reduce((aggValue, newValue) -> aggValue + " " + newValue);
+        reducedTable.toStream().to("windowing-output-topic", Produced.with(WindowedSerdes.timeWindowedSerdeFrom(String.class), Serdes.toString()));
+
         final Topology topology = builder.build();
         final KafkaStreams streams = new KafkaStreams(topology, props);
         // Print the topology to the console.
